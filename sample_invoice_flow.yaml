@@ -1,0 +1,175 @@
+# sample_invoice_flow.yaml
+# Sample workflow for invoice processing
+# This demonstrates the flow structure and capabilities
+
+name: Invoice Processing Workflow
+description: |
+  Complete invoice processing workflow that:
+  1. Reads invoice files from SharePoint
+  2. Validates invoice data
+  3. Inserts records into SQL database
+  4. Sends email notifications to finance team
+  5. Logs completion status
+
+version: 1
+
+steps:
+  # Step 1: Read invoice from SharePoint
+  - id: read_invoice
+    name: Read Invoice File
+    type: sharepoint
+    connector: sharepoint
+    action: read_file
+    params:
+      filename: invoice_latest.xlsx
+      path: /invoices/incoming
+    onError: stop
+    retry:
+      enabled: true
+      max_attempts: 3
+      delay_seconds: 5
+
+  # Step 2: Validate invoice data
+  - id: validate_invoice
+    name: Validate Invoice Data
+    type: sql
+    connector: sql
+    action: query
+    params:
+      query: "SELECT COUNT(*) FROM vendors WHERE vendor_id = '${read_invoice.vendor_id}'"
+    onError: stop
+    retry:
+      enabled: false
+
+  # Step 3: Insert invoice into database
+  - id: insert_invoice
+    name: Save Invoice to Database
+    type: sql
+    connector: sql
+    action: insert
+    params:
+      table: invoices
+      columns:
+        - invoice_id
+        - vendor_id
+        - amount
+        - date
+        - status
+      values:
+        invoice_id: "${read_invoice.invoice_id}"
+        vendor_id: "${read_invoice.vendor_id}"
+        amount: "${read_invoice.amount}"
+        date: "${read_invoice.date}"
+        status: "pending_approval"
+    onError: stop
+    retry:
+      enabled: true
+      max_attempts: 2
+
+  # Step 4: Send notification to finance
+  - id: notify_finance
+    name: Send Email to Finance Team
+    type: email
+    connector: email
+    action: send
+    params:
+      to: finance@company.com
+      cc: 
+        - manager@company.com
+      subject: "New Invoice: ${read_invoice.invoice_id}"
+      body: |
+        A new invoice has been received and processed.
+        
+        Invoice ID: ${read_invoice.invoice_id}
+        Vendor: ${read_invoice.vendor_name}
+        Amount: ${read_invoice.amount}
+        Status: Pending Approval
+        
+        Please review in the system.
+      attachments:
+        - invoice_latest.xlsx
+    onError: continue
+    retry:
+      enabled: true
+      max_attempts: 3
+
+  # Step 5: Update processing status
+  - id: update_status
+    name: Update Processing Status
+    type: sql
+    connector: sql
+    action: update
+    params:
+      table: invoice_processing_log
+      set:
+        status: completed
+        processed_at: CURRENT_TIMESTAMP
+        processed_by: self_agent
+      where:
+        invoice_id: "${read_invoice.invoice_id}"
+    onError: continue
+
+  # Step 6: Send completion notification
+  - id: send_completion_alert
+    name: Send Completion Alert
+    type: notification
+    connector: notification
+    action: send_notification
+    params:
+      message: "Invoice ${read_invoice.invoice_id} processed successfully"
+      priority: normal
+      channel: teams
+    onError: continue
+
+# Workflow configuration
+config:
+  timeout_minutes: 30
+  max_retries: 3
+  parallel_execution: false
+  
+# Triggers (future enhancement)
+triggers:
+  - type: schedule
+    cron: "0 9 * * MON-FRI"  # Every weekday at 9 AM
+  - type: event
+    source: sharepoint
+    event: file_uploaded
+    filter:
+      path: /invoices/incoming
+
+# Conditions and branching (future enhancement)
+conditions:
+  - step: validate_invoice
+    if:
+      field: result.count
+      operator: equals
+      value: 0
+    then:
+      action: stop
+      message: "Vendor not found in database"
+  
+  - step: insert_invoice
+    if:
+      field: result.rows_affected
+      operator: greater_than
+      value: 0
+    then:
+      action: continue
+    else:
+      action: notify_error
+
+# Error handling
+error_handling:
+  default_action: stop
+  notification_on_failure: true
+  notification_recipients:
+    - admin@company.com
+    - operations@company.com
+
+# Metadata
+metadata:
+  author: system
+  category: finance
+  tags:
+    - invoice
+    - accounts_payable

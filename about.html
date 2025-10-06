@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self Agent - Enterprise Architecture & System Diagrams</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 20px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #64748b;
+            transition: all 0.3s;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .tab:hover {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .tab.active {
+            color: #3b82f6;
+            background: white;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #3b82f6;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .diagram-section {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .diagram-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            color: #1e293b;
+            margin-bottom: 20px;
+            font-weight: 600;
+            border-left: 4px solid #3b82f6;
+            padding-left: 16px;
+        }
+
+        .section-subtitle {
+            font-size: 1.3rem;
+            color: #475569;
+            margin: 30px 0 15px;
+            font-weight: 600;
+        }
+
+        .diagram {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            border: 2px solid #e2e8f0;
+        }
+
+        .layer {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #3b82f6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .layer-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .layer-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-right: 12px;
+        }
+
+        .components {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .component {
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            transition: all 0.3s;
+        }
+
+        .component:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+        }
+
+        .component-name {
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 5px;
+        }
+
+        .component-desc {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .flow-diagram {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .flow-step {
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .flow-step::after {
+            content: '↓';
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.5rem;
+            color: #3b82f6;
+        }
+
+        .flow-step:last-child::after {
+            content: '';
+        }
+
+        .flow-step-title {
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .flow-step-desc {
+            color: #475569;
+            font-size: 0.95rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid #3b82f6;
+        }
+
+        .card-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .card-content {
+            color: #64748b;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 4px;
+        }
+
+        .badge-primary { background: #dbeafe; color: #1e40af; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .badge-info { background: #e0e7ff; color: #3730a3; }
+
+        .architecture-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .arch-block {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+
+        .arch-block:hover {
+            border-color: #3b82f6;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.2);
+        }
+
+        .arch-block-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .arch-block-title {
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 5px;
+        }
+
+        .arch-block-desc {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .deployment-option {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 15px 0;
+            border-left: 6px solid #10b981;
+        }
+
+        .deployment-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #059669;
+            margin-bottom: 10px;
+        }
+
+        .deployment-desc {
+            color: #475569;
+            margin-bottom: 15px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #64748b;
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .feature-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background: #1e293b;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #475569;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2, .grid-3, .architecture-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Self Agent - Enterprise Architecture</h1>
+            <p>Comprehensive System Design & Deployment Strategies</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('overview')">📊 Overview</button>
+            <button class="tab" onclick="showTab('architecture')">🏗️ Architecture</button>
+            <button class="tab" onclick="showTab('business')">💼 Business Flow</button>
+            <button class="tab" onclick="showTab('security')">🔒 Security</button>
+            <button class="tab" onclick="showTab('deployment')">🚀 Deployment</button>
+            <button class="tab" onclick="showTab('observability')">📈 Observability</button>
+            <button class="tab" onclick="showTab('scalability')">⚡ Scalability</button>
+        </div>
+
+        <div class="content">
+            <!-- OVERVIEW TAB -->
+            <div id="overview" class="diagram-section active">
+                <h2 class="section-title">System Overview</h2>
+                
+                <div class="diagram">
+                    <h3 class="section-subtitle">Core Capabilities</h3>
+                    <div class="architecture-grid">
+                        <div class="arch-block">
+                            <div class="arch-block-icon">💬</div>
+                            <div class="arch-block-title">Conversational AI</div>
+                            <div class="arch-block-desc">Natural language interaction with intent detection</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">🔄</div>
+                            <div class="arch-block-title">Workflow Engine</div>
+                            <div class="arch-block-desc">Execute multi-step processes with versioning</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">🔌</div>
+                            <div class="arch-block-title">Connector Hub</div>
+                            <div class="arch-block-desc">Pluggable integrations for external systems</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">🧠</div>
+                            <div class="arch-block-title">Semantic Memory</div>
+                            <div class="arch-block-desc">Vector-based knowledge retrieval</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">👥</div>
+                            <div class="arch-block-title">Multi-Tenancy</div>
+                            <div class="arch-block-desc">Isolated workspaces per organization</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">🔐</div>
+                            <div class="arch-block-title">Security & Auth</div>
+                            <div class="arch-block-desc">RBAC, OAuth2, JWT authentication</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">📊</div>
+                            <div class="arch-block-title">Observability</div>
+                            <div class="arch-block-desc">Metrics, logs, traces, and monitoring</div>
+                        </div>
+                        <div class="arch-block">
+                            <div class="arch-block-icon">⚡</div>
+                            <div class="arch-block-title">High Performance</div>
+                            <div class="arch-block-desc">Async processing and caching</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Technology Stack</h3>
+                <div class="grid-3">
+                    <div class="card">
+                        <div class="card-title">Frontend Layer</div>
+                        <div class="card-content">
+                            <span class="badge badge-primary">Streamlit</span>
+                            <span class="badge badge-primary">React (Future)</span>
+                            <span class="badge badge-primary">TypeScript</span>
+                            <span class="badge badge-primary">TailwindCSS</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Backend Layer</div>
+                        <div class="card-content">
+                            <span class="badge badge-success">FastAPI</span>
+                            <span class="badge badge-success">Python 3.11+</span>
+                            <span class="badge badge-success">AsyncIO</span>
+                            <span class="badge badge-success">Celery</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Data Layer</div>
+                        <div class="card-content">
+                            <span class="badge badge-info">PostgreSQL</span>
+                            <span class="badge badge-info">Redis</span>
+                            <span class="badge badge-info">FAISS</span>
+                            <span class="badge badge-info">S3/Blob</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-3">
+                    <div class="card">
+                        <div class="card-title">AI & ML</div>
+                        <div class="card-content">
+                            <span class="badge badge-warning">Azure OpenAI</span>
+                            <span class="badge badge-warning">Embeddings</span>
+                            <span class="badge badge-warning">LangChain</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Infrastructure</div>
+                        <div class="card-content">
+                            <span class="badge badge-danger">Docker</span>
+                            <span class="badge badge-danger">Kubernetes</span>
+                            <span class="badge badge-danger">Terraform</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Observability</div>
+                        <div class="card-content">
+                            <span class="badge badge-primary">Prometheus</span>
+                            <span class="badge badge-primary">Grafana</span>
+                            <span class="badge badge-primary">ELK Stack</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ARCHITECTURE TAB -->
+            <div id="architecture" class="diagram-section">
+                <h2 class="section-title">System Architecture</h2>
+
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">🖥️</div>
+                        Presentation Layer
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Web Application</div>
+                            <div class="component-desc">Streamlit UI / React SPA</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Mobile App</div>
+                            <div class="component-desc">React Native (Future)</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">API Gateway</div>
+                            <div class="component-desc">Kong / Azure API Management</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">CDN</div>
+                            <div class="component-desc">Cloudflare / Azure CDN</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">🔐</div>
+                        Security & Authentication Layer
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">OAuth2 / OIDC</div>
+                            <div class="component-desc">Azure AD, Okta, Auth0</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">JWT Manager</div>
+                            <div class="component-desc">Token validation & refresh</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">RBAC Engine</div>
+                            <div class="component-desc">Role-based access control</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">API Key Manager</div>
+                            <div class="component-desc">Service-to-service auth</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">⚙️</div>
+                        Application Layer
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Intent Service</div>
+                            <div class="component-desc">NLP intent detection</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Workflow Engine</div>
+                            <div class="component-desc">Flow execution & orchestration</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Connector Hub</div>
+                            <div class="component-desc">External system integrations</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Memory Service</div>
+                            <div class="component-desc">Vector search & retrieval</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Conversation Manager</div>
+                            <div class="component-desc">Chat history & context</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Notification Service</div>
+                            <div class="component-desc">Email, SMS, webhooks</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">🗄️</div>
+                        Data Layer
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">PostgreSQL</div>
+                            <div class="component-desc">Transactional data</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Redis</div>
+                            <div class="component-desc">Caching & sessions</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">FAISS / Pinecone</div>
+                            <div class="component-desc">Vector embeddings</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">S3 / Blob Storage</div>
+                            <div class="component-desc">Files & artifacts</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Elasticsearch</div>
+                            <div class="component-desc">Full-text search</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">ClickHouse</div>
+                            <div class="component-desc">Analytics & metrics</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">📊</div>
+                        Observability Layer
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Metrics</div>
+                            <div class="component-desc">Prometheus + Grafana</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Logging</div>
+                            <div class="component-desc">ELK / Loki</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Tracing</div>
+                            <div class="component-desc">Jaeger / Tempo</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">APM</div>
+                            <div class="component-desc">Application Performance Monitoring</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Alerting</div>
+                            <div class="component-desc">PagerDuty / OpsGenie</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Health Checks</div>
+                            <div class="component-desc">Liveness & readiness probes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">🤖</div>
+                        AI/ML Layer
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Azure OpenAI</div>
+                            <div class="component-desc">GPT-4, Embeddings</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Model Gateway</div>
+                            <div class="component-desc">Multi-provider routing</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Prompt Manager</div>
+                            <div class="component-desc">Template versioning</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Fine-tuning Pipeline</div>
+                            <div class="component-desc">Custom model training</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BUSINESS FLOW TAB -->
+            <div id="business" class="diagram-section">
+                <h2 class="section-title">Business Process Flows</h2>
+
+                <h3 class="section-subtitle">User Interaction Flow</h3>
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <div class="flow-step-title">1. User Authentication</div>
+                        <div class="flow-step-desc">User logs in via OAuth2 (Azure AD / Okta) → JWT token issued → Session established</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">2. Tenant Context Resolution</div>
+                        <div class="flow-step-desc">System identifies user's organization → Loads tenant-specific configuration → Sets data isolation boundaries</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">3. Intent Detection</div>
+                        <div class="flow-step-desc">User sends message → Embedding generated → Vector search (FAISS) → Azure OpenAI fallback → Intent classified</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">4. Action Routing</div>
+                        <div class="flow-step-desc">Intent mapped to handler → Permission check (RBAC) → Execute appropriate service (Flow/Connector/Memory)</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">5. Workflow Execution</div>
+                        <div class="flow-step-desc">Load flow definition → Validate connectors → Execute steps sequentially/parallel → Track progress → Handle errors</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">6. Response Generation</div>
+                        <div class="flow-step-desc">Aggregate results → Generate natural language response (LLM) → Include context & metadata → Return to user</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">7. Audit & Observability</div>
+                        <div class="flow-step-desc">Log all actions → Emit metrics → Trace request → Update conversation history → Store in vector index</div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Workflow Execution Engine</h3>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title">🔄 Synchronous Execution</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Sequential step execution</li>
+                                <li>Real-time status updates</li>
+                                <li>Immediate error handling</li>
+                                <li>Sub-5 minute workflows</li>
+                                <li>Direct user feedback</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">⚡ Asynchronous Execution</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Background job processing</li>
+                                <li>Celery task queue</li>
+                                <li>Polling-based status checks</li>
+                                <li>Long-running workflows (hours)</li>
+                                <li>Webhook notifications on completion</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Multi-Tenant Data Flow</h3>
+                <div class="diagram">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Layer</th>
+                                <th>Isolation Method</th>
+                                <th>Implementation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Database</strong></td>
+                                <td>Row-Level Security</td>
+                                <td>tenant_id column in all tables + PostgreSQL RLS policies</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Storage</strong></td>
+                                <td>Path-Based</td>
+                                <td>S3 buckets: /tenant-{id}/flows/ structure</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cache</strong></td>
+                                <td>Key Prefixing</td>
+                                <td>Redis keys: tenant:{id}:session:{session_id}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Vector Store</strong></td>
+                                <td>Namespace Isolation</td>
+                                <td>FAISS/Pinecone namespaces per tenant</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Search</strong></td>
+                                <td>Index Filtering</td>
+                                <td>Elasticsearch index per tenant or filter by tenant_id</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Logs</strong></td>
+                                <td>Metadata Tagging</td>
+                                <td>All logs tagged with tenant_id for filtering</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECURITY TAB -->
+            <div id="security" class="diagram-section">
+                <h2 class="section-title">Security Architecture</h2>
+
+                <h3 class="section-subtitle">Authentication & Authorization</h3>
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">🔐</div>
+                        Authentication Providers
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Azure AD / Entra ID</div>
+                            <div class="component-desc">Enterprise SSO with MFA</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Okta</div>
+                            <div class="component-desc">Identity management platform</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Auth0</div>
+                            <div class="component-desc">Universal authentication</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Google Workspace</div>
+                            <div class="component-desc">Google OAuth integration</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">SAML 2.0</div>
+                            <div class="component-desc">Enterprise federation</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">API Keys</div>
+                            <div class="component-desc">Service-to-service auth</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Role-Based Access Control (RBAC)</h3>
+                <div class="diagram">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Role</th>
+                                <th>Permissions</th>
+                                <th>Use Case</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Super Admin</strong></td>
+                                <td>Full system access, tenant management, billing</td>
+                                <td>Platform administrators</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tenant Admin</strong></td>
+                                <td>Manage users, flows, connectors within tenant</td>
+                                <td>Organization administrators</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Flow Designer</strong></td>
+                                <td>Create/edit/delete flows, view executions</td>
+                                <td>Business analysts, developers</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Flow Executor</strong></td>
+                                <td>Execute flows, view results, no editing</td>
+                                <td>Operations team</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Viewer</strong></td>
+                                <td>Read-only access to flows and executions</td>
+                                <td>Stakeholders, auditors</td>
+                            </tr>
+                            <tr>
+                                <td><strong>API User</strong></td>
+                                <td>Programmatic access via API keys</td>
+                                <td>External systems, CI/CD</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="section-subtitle">Security Layers</h3>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title">🛡️ Network Security</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>TLS 1.3 for all communications</li>
+                                <li>VPC isolation in cloud environments</li>
+                                <li>Network policies (Kubernetes)</li>
+                                <li>Private endpoints for databases</li>
+                                <li>WAF (Web Application Firewall)</li>
+                                <li>DDoS protection (Cloudflare)</li>
+                                <li>IP whitelisting for admin access</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔒 Data Security</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Encryption at rest (AES-256)</li>
+                                <li>Encryption in transit (TLS)</li>
+                                <li>Secrets management (Azure Key Vault)</li>
+                                <li>PII data masking & redaction</li>
+                                <li>Regular automated backups</li>
+                                <li>Point-in-time recovery</li>
+                                <li>Data retention policies</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title">🔍 Application Security</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Input validation & sanitization</li>
+                                <li>SQL injection prevention (ORM)</li>
+                                <li>XSS protection (CSP headers)</li>
+                                <li>CSRF tokens for forms</li>
+                                <li>Rate limiting (per user/IP)</li>
+                                <li>Request size limits</li>
+                                <li>Dependency vulnerability scanning</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📋 Compliance & Audit</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>SOC 2 Type II compliance</li>
+                                <li>GDPR compliance (EU)</li>
+                                <li>HIPAA compliance (healthcare)</li>
+                                <li>Audit logs for all actions</li>
+                                <li>Immutable audit trail</li>
+                                <li>Access logs (who, what, when)</li>
+                                <li>Regular security audits</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Security Incident Response</h3>
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <div class="flow-step-title">Detection</div>
+                        <div class="flow-step-desc">Automated monitoring alerts → SIEM integration → Anomaly detection → Security team notified</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Containment</div>
+                        <div class="flow-step-desc">Isolate affected systems → Revoke compromised credentials → Block suspicious IPs → Preserve evidence</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Investigation</div>
+                        <div class="flow-step-desc">Analyze logs → Identify root cause → Assess impact → Document findings</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Remediation</div>
+                        <div class="flow-step-desc">Apply patches → Reset credentials → Update security policies → Restore services</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Post-Incident</div>
+                        <div class="flow-step-desc">Post-mortem analysis → Update runbooks → Improve detection → Communicate with stakeholders</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEPLOYMENT TAB -->
+            <div id="deployment" class="diagram-section">
+                <h2 class="section-title">Deployment Strategies</h2>
+
+                <div class="deployment-option">
+                    <div class="deployment-title">🏢 On-Premises Deployment</div>
+                    <div class="deployment-desc">Complete control and data sovereignty for regulated industries</div>
+                    <div class="grid-2">
+                        <div>
+                            <strong>Architecture:</strong>
+                            <ul class="feature-list">
+                                <li>Kubernetes cluster (3+ master nodes)</li>
+                                <li>PostgreSQL HA cluster (Primary + Replicas)</li>
+                                <li>Redis Sentinel for cache HA</li>
+                                <li>HAProxy / Nginx for load balancing</li>
+                                <li>NetApp / SAN for persistent storage</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong>Requirements:</strong>
+                            <ul class="feature-list">
+                                <li>Minimum: 64GB RAM, 16 CPU cores</li>
+                                <li>Recommended: 128GB RAM, 32 CPU cores</li>
+                                <li>1TB SSD for database</li>
+                                <li>10Gbps network connectivity</li>
+                                <li>Backup infrastructure</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="deployment-option" style="border-left-color: #3b82f6;">
+                    <div class="deployment-title" style="color: #2563eb;">☁️ Cloud Deployment (Azure)</div>
+                    <div class="deployment-desc">Scalable, managed services with global reach</div>
+                    <div class="grid-2">
+                        <div>
+                            <strong>Services:</strong>
+                            <ul class="feature-list">
+                                <li>Azure Kubernetes Service (AKS)</li>
+                                <li>Azure Database for PostgreSQL</li>
+                                <li>Azure Cache for Redis</li>
+                                <li>Azure Blob Storage</li>
+                                <li>Azure Application Gateway</li>
+                                <li>Azure Monitor & Application Insights</li>
+                                <li>Azure Key Vault</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong>Configuration:</strong>
+                            <ul class="feature-list">
+                                <li>Multi-region deployment (active-active)</li>
+                                <li>Auto-scaling (2-10 pods)</li>
+                                <li>Managed backups (daily + PITR)</li>
+                                <li>99.95% SLA</li>
+                                <li>DDoS protection included</li>
+                                <li>Cost: ~$500-2000/month</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="deployment-option" style="border-left-color: #f59e0b;">
+                    <div class="deployment-title" style="color: #d97706;">🔀 Hybrid Deployment</div>
+                    <div class="deployment-desc">Best of both worlds - sensitive data on-prem, compute in cloud</div>
+                    <div class="grid-2">
+                        <div>
+                            <strong>On-Premises:</strong>
+                            <ul class="feature-list">
+                                <li>Primary database (PostgreSQL)</li>
+                                <li>Sensitive data storage</li>
+                                <li>Internal connectors (SAP, legacy systems)</li>
+                                <li>Audit & compliance data</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <strong>Cloud:</strong>
+                            <ul class="feature-list">
+                                <li>Application servers (AKS)</li>
+                                <li>Vector database (Pinecone)</li>
+                                <li>LLM services (Azure OpenAI)</li>
+                                <li>CDN & static assets</li>
+                                <li>Monitoring & analytics</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="deployment-option" style="border-left-color: #8b5cf6;">
+                    <div class="deployment-title" style="color: #7c3aed;">🐳 Docker Compose (Dev/Testing)</div>
+                    <div class="deployment-desc">Simplified single-machine deployment for development</div>
+                    <div>
+                        <strong>Services:</strong>
+                        <ul class="feature-list">
+                            <li>FastAPI backend (2 replicas)</li>
+                            <li>Streamlit frontend</li>
+                            <li>PostgreSQL database</li>
+                            <li>Redis cache</li>
+                            <li>Nginx reverse proxy</li>
+                            <li>Prometheus + Grafana</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">CI/CD Pipeline</h3>
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <div class="flow-step-title">1. Code Commit</div>
+                        <div class="flow-step-desc">Developer pushes to Git → Webhook triggers pipeline → Branch protection checks</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">2. Build & Test</div>
+                        <div class="flow-step-desc">Install dependencies → Run unit tests → Run integration tests → Code coverage report (>80%)</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">3. Security Scan</div>
+                        <div class="flow-step-desc">SAST (Bandit, SonarQube) → Dependency check (Snyk) → Container scan (Trivy) → Secrets detection</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">4. Build Artifacts</div>
+                        <div class="flow-step-desc">Build Docker images → Tag with version → Push to container registry (ACR/ECR)</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">5. Deploy to Staging</div>
+                        <div class="flow-step-desc">Update Kubernetes manifests → Apply with Helm/Kustomize → Run smoke tests → Health checks</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">6. Deploy to Production</div>
+                        <div class="flow-step-desc">Blue-green deployment → Canary release (10% → 50% → 100%) → Monitor metrics → Rollback if needed</div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Infrastructure as Code</h3>
+                <div class="grid-3">
+                    <div class="card">
+                        <div class="card-title">Terraform</div>
+                        <div class="card-content">
+                            Provision cloud infrastructure (VPC, AKS, databases, networking)
+                            <div style="margin-top: 10px;">
+                                <span class="badge badge-info">Azure</span>
+                                <span class="badge badge-info">AWS</span>
+                                <span class="badge badge-info">GCP</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Helm Charts</div>
+                        <div class="card-content">
+                            Package Kubernetes applications with templating and versioning
+                            <div style="margin-top: 10px;">
+                                <span class="badge badge-success">K8s</span>
+                                <span class="badge badge-success">Versioned</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Ansible</div>
+                        <div class="card-content">
+                            Configuration management for on-premises servers
+                            <div style="margin-top: 10px;">
+                                <span class="badge badge-warning">On-Prem</span>
+                                <span class="badge badge-warning">Automation</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OBSERVABILITY TAB -->
+            <div id="observability" class="diagram-section">
+                <h2 class="section-title">Observability & Monitoring</h2>
+
+                <h3 class="section-subtitle">Three Pillars of Observability</h3>
+                <div class="grid-3">
+                    <div class="card">
+                        <div class="card-title">📊 Metrics</div>
+                        <div class="card-content">
+                            <strong>Prometheus + Grafana</strong>
+                            <ul class="feature-list">
+                                <li>Request rate, latency, errors</li>
+                                <li>CPU, memory, disk usage</li>
+                                <li>Database query performance</li>
+                                <li>Cache hit rates</li>
+                                <li>LLM token usage & costs</li>
+                                <li>Business KPIs (flows/day)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📝 Logs</div>
+                        <div class="card-content">
+                            <strong>ELK Stack / Loki</strong>
+                            <ul class="feature-list">
+                                <li>Application logs (JSON structured)</li>
+                                <li>Access logs (Nginx/Gateway)</li>
+                                <li>Error logs with stack traces</li>
+                                <li>Audit logs (user actions)</li>
+                                <li>Security logs (auth events)</li>
+                                <li>Centralized log aggregation</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔍 Traces</div>
+                        <div class="card-content">
+                            <strong>Jaeger / Tempo</strong>
+                            <ul class="feature-list">
+                                <li>Distributed tracing</li>
+                                <li>Request flow visualization</li>
+                                <li>Service dependency maps</li>
+                                <li>Latency breakdown by service</li>
+                                <li>Error propagation tracking</li>
+                                <li>OpenTelemetry instrumentation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Key Metrics Dashboard</h3>
+                <div class="diagram">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Metric</th>
+                                <th>Target</th>
+                                <th>Alert Threshold</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td rowspan="3"><strong>Performance</strong></td>
+                                <td>API Response Time (p95)</td>
+                                <td>&lt; 500ms</td>
+                                <td>&gt; 1000ms</td>
+                            </tr>
+                            <tr>
+                                <td>LLM Response Time (p95)</td>
+                                <td>&lt; 3s</td>
+                                <td>&gt; 10s</td>
+                            </tr>
+                            <tr>
+                                <td>Flow Execution Time (avg)</td>
+                                <td>&lt; 30s</td>
+                                <td>&gt; 5min</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="3"><strong>Reliability</strong></td>
+                                <td>Uptime</td>
+                                <td>99.9%</td>
+                                <td>&lt; 99.5%</td>
+                            </tr>
+                            <tr>
+                                <td>Error Rate</td>
+                                <td>&lt; 0.1%</td>
+                                <td>&gt; 1%</td>
+                            </tr>
+                            <tr>
+                                <td>Success Rate (Flows)</td>
+                                <td>&gt; 98%</td>
+                                <td>&lt; 95%</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="3"><strong>Resources</strong></td>
+                                <td>CPU Usage</td>
+                                <td>&lt; 70%</td>
+                                <td>&gt; 85%</td>
+                            </tr>
+                            <tr>
+                                <td>Memory Usage</td>
+                                <td>&lt; 80%</td>
+                                <td>&gt; 90%</td>
+                            </tr>
+                            <tr>
+                                <td>Database Connections</td>
+                                <td>&lt; 70% of pool</td>
+                                <td>&gt; 90% of pool</td>
+                            </tr>
+                            <tr>
+                                <td rowspan="2"><strong>Business</strong></td>
+                                <td>Daily Active Users</td>
+                                <td>Track trend</td>
+                                <td>20% drop</td>
+                            </tr>
+                            <tr>
+                                <td>Flows Executed/Day</td>
+                                <td>Track trend</td>
+                                <td>30% drop</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="section-subtitle">Alerting Strategy</h3>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title">🚨 Critical Alerts (P1)</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Service down / Unavailable</li>
+                                <li>Database connection failures</li>
+                                <li>Error rate &gt; 5%</li>
+                                <li>Security breach detected</li>
+                                <li>Data loss incident</li>
+                            </ul>
+                            <strong>Response:</strong> Immediate (5min), PagerDuty, SMS
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">⚠️ Warning Alerts (P2)</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>High latency (&gt; 2s p95)</li>
+                                <li>Resource usage &gt; 85%</li>
+                                <li>Elevated error rate (1-5%)</li>
+                                <li>Queue backlog growing</li>
+                                <li>Cache miss rate high</li>
+                            </ul>
+                            <strong>Response:</strong> 30min, Slack, Email
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Health Checks</h3>
+                <div class="diagram">
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Liveness Probe</div>
+                            <div class="component-desc">Is the service running? (HTTP /health/live)</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Readiness Probe</div>
+                            <div class="component-desc">Can it accept traffic? (HTTP /health/ready)</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Startup Probe</div>
+                            <div class="component-desc">Has initialization completed?</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Dependency Checks</div>
+                            <div class="component-desc">Database, Redis, Azure OpenAI reachable</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCALABILITY TAB -->
+            <div id="scalability" class="diagram-section">
+                <h2 class="section-title">Scalability & Performance</h2>
+
+                <h3 class="section-subtitle">Horizontal Scaling Strategy</h3>
+                <div class="layer">
+                    <div class="layer-title">
+                        <div class="layer-icon">⚡</div>
+                        Auto-Scaling Configuration
+                    </div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">Frontend (Streamlit)</div>
+                            <div class="component-desc">2-10 pods, CPU &gt; 70% triggers scale</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">API Backend</div>
+                            <div class="component-desc">3-20 pods, Request rate based</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Worker Queue</div>
+                            <div class="component-desc">2-50 workers, Queue depth based</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Database</div>
+                            <div class="component-desc">Read replicas: 1-5, auto-add on load</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Performance Optimizations</h3>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title">🚀 Caching Strategy</div>
+                        <div class="card-content">
+                            <table style="font-size: 0.9rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Layer</th>
+                                        <th>TTL</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>User sessions</td>
+                                        <td>24 hours</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Flow definitions</td>
+                                        <td>1 hour</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Connector metadata</td>
+                                        <td>6 hours</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Intent embeddings</td>
+                                        <td>24 hours</td>
+                                    </tr>
+                                    <tr>
+                                        <td>API responses</td>
+                                        <td>5 minutes</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔧 Database Optimizations</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Connection pooling (min: 10, max: 100)</li>
+                                <li>Prepared statements</li>
+                                <li>Indexed columns (tenant_id, created_at)</li>
+                                <li>Partitioning (runs table by month)</li>
+                                <li>Read replicas for analytics</li>
+                                <li>Query optimization (EXPLAIN ANALYZE)</li>
+                                <li>Materialized views for dashboards</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Load Distribution</h3>
+                <div class="diagram">
+                    <div class="flow-step">
+                        <div class="flow-step-title">Client Request</div>
+                        <div class="flow-step-desc">User/Application → DNS (Route 53) → Geographic routing to nearest region</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">CDN Layer</div>
+                        <div class="flow-step-desc">Cloudflare / Azure CDN → Cache static assets → DDoS protection</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Load Balancer</div>
+                        <div class="flow-step-desc">Azure Application Gateway → SSL termination → Round-robin to backend pods</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Application Pods</div>
+                        <div class="flow-step-desc">Kubernetes Service → Selects healthy pod → Processes request</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-title">Data Layer</div>
+                        <div class="flow-step-desc">Write: Primary DB | Read: Read replica (load balanced)</div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Capacity Planning</h3>
+                <div class="diagram">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User Scale</th>
+                                <th>Infrastructure</th>
+                                <th>Estimated Cost/Month</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>100 users</strong></td>
+                                <td>2 API pods, 1 DB (Standard), Redis (Basic)</td>
+                                <td>$500</td>
+                            </tr>
+                            <tr>
+                                <td><strong>1,000 users</strong></td>
+                                <td>5 API pods, 1 DB (General Purpose), Redis (Standard)</td>
+                                <td>$1,500</td>
+                            </tr>
+                            <tr>
+                                <td><strong>10,000 users</strong></td>
+                                <td>10 API pods, DB HA (2 replicas), Redis (Premium)</td>
+                                <td>$5,000</td>
+                            </tr>
+                            <tr>
+                                <td><strong>100,000 users</strong></td>
+                                <td>20+ API pods, Multi-region DB, Redis cluster</td>
+                                <td>$15,000+</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="section-subtitle">Multi-Region Architecture</h3>
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-title">🌍 Active-Active (Global)</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Multiple regions serve traffic simultaneously</li>
+                                <li>GeoDNS routes to nearest region</li>
+                                <li>Database replication (async)</li>
+                                <li>Global cache synchronization</li>
+                                <li>Eventual consistency model</li>
+                                <li>Best for: Global user base</li>
+                                <li>RPO: Minutes | RTO: Seconds</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔄 Active-Passive (DR)</div>
+                        <div class="card-content">
+                            <ul class="feature-list">
+                                <li>Primary region handles all traffic</li>
+                                <li>Secondary region on standby</li>
+                                <li>Continuous backup to secondary</li>
+                                <li>Manual or auto-failover</li>
+                                <li>Strong consistency</li>
+                                <li>Best for: Cost optimization</li>
+                                <li>RPO: Hours | RTO: Minutes</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Queue-Based Processing</h3>
+                <div class="diagram">
+                    <div class="layer-title">Asynchronous Task Queue (Celery + RabbitMQ)</div>
+                    <div class="components">
+                        <div class="component">
+                            <div class="component-name">High Priority Queue</div>
+                            <div class="component-desc">User-facing tasks, SLA: 30s</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Standard Queue</div>
+                            <div class="component-desc">Flow executions, SLA: 5min</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Low Priority Queue</div>
+                            <div class="component-desc">Analytics, reporting, SLA: 1hr</div>
+                        </div>
+                        <div class="component">
+                            <div class="component-name">Dead Letter Queue</div>
+                            <div class="component-desc">Failed tasks for manual review</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="section-subtitle">Performance Benchmarks</h3>
+                <div class="diagram">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Operation</th>
+                                <th>Current (MVP)</th>
+                                <th>Target (Production)</th>
+                                <th>Optimization</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Chat Response</td>
+                                <td>2-5 seconds</td>
+                                <td>&lt; 1 second</td>
+                                <td>Intent caching, streaming</td>
+                            </tr>
+                            <tr>
+                                <td>Flow Execution (simple)</td>
+                                <td>5-10 seconds</td>
+                                <td>&lt; 3 seconds</td>
+                                <td>Connector pooling, parallel steps</td>
+                            </tr>
+                            <tr>
+                                <td>Vector Search</td>
+                                <td>200-500ms</td>
+                                <td>&lt; 50ms</td>
+                                <td>HNSW index, GPU acceleration</td>
+                            </tr>
+                            <tr>
+                                <td>Database Query</td>
+                                <td>50-200ms</td>
+                                <td>&lt; 20ms</td>
+                                <td>Indexing, query optimization</td>
+                            </tr>
+                            <tr>
+                                <td>Page Load</td>
+                                <td>1-3 seconds</td>
+                                <td>&lt; 1 second</td>
+                                <td>Code splitting, lazy loading</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div style="background: #f8fafc; padding: 30px; margin-top: 40px; border-top: 2px solid #e2e8f0;">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <span>Core Service</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #10b981;"></div>
+                    <span>Data Layer</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span>External Integration</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span>Security Component</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #8b5cf6;"></div>
+                    <span>Observability</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #6b7280;"></div>
+                    <span>Infrastructure</span>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 30px; border-top: 1px solid #cbd5e1;">
+                <h3 style="color: #1e293b; margin-bottom: 15px; font-size: 1.2rem;">Key Design Principles</h3>
+                <div class="grid-3">
+                    <div>
+                        <strong>🏗️ Scalability</strong>
+                        <p style="color: #64748b; margin-top: 8px; font-size: 0.95rem;">Horizontal scaling, stateless services, queue-based processing</p>
+                    </div>
+                    <div>
+                        <strong>🔒 Security</strong>
+                        <p style="color: #64748b; margin-top: 8px; font-size: 0.95rem;">Defense in depth, zero trust, encryption everywhere</p>
+                    </div>
+                    <div>
+                        <strong>📊 Observability</strong>
+                        <p style="color: #64748b; margin-top: 8px; font-size: 0.95rem;">Metrics, logs, traces - full visibility into system behavior</p>
+                    </div>
+                    <div>
+                        <strong>⚡ Performance</strong>
+                        <p style="color: #64748b; margin-top: 8px; font-size: 0.95rem;">Caching, async processing, optimized queries</p>
+                    </div>
+                    <div>
+                        <strong>🛡️ Reliability</strong>
+                        <p style="color: #64748b; margin-top: 8px; font-size: 0.95rem;">Redundancy, failover, graceful degradation</p>
+                    </div>
+                    <div>
+                        <strong>🔧 Maintainability</strong>
+                        <p style="color: #64748b; margin-top: 8px; font-size: 0.95rem;">IaC, CI/CD, automated testing, documentation</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding: 25px; background: linear-gradient(135deg, #1e293b, #334155); border-radius: 12px; color: white;">
+                <h3 style="color: white; margin-bottom: 15px; font-size: 1.3rem;">📋 Implementation Roadmap</h3>
+                <div class="grid-2" style="gap: 20px;">
+                    <div>
+                        <strong style="color: #60a5fa;">Phase 1: MVP (Current)</strong>
+                        <ul style="margin-top: 10px; opacity: 0.9; line-height: 1.8;">
+                            <li>✅ Core workflow engine</li>
+                            <li>✅ Basic connectors (4)</li>
+                            <li>✅ Single-tenant deployment</li>
+                            <li>✅ SQLite database</li>
+                            <li>✅ Local FAISS index</li>
+                            <li>✅ Basic monitoring</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong style="color: #34d399;">Phase 2: Production Ready</strong>
+                        <ul style="margin-top: 10px; opacity: 0.9; line-height: 1.8;">
+                            <li>🔲 Multi-tenancy support</li>
+                            <li>🔲 OAuth2 authentication</li>
+                            <li>🔲 RBAC implementation</li>
+                            <li>🔲 PostgreSQL migration</li>
+                            <li>🔲 Redis caching</li>
+                            <li>🔲 Kubernetes deployment</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong style="color: #fbbf24;">Phase 3: Enterprise</strong>
+                        <ul style="margin-top: 10px; opacity: 0.9; line-height: 1.8;">
+                            <li>🔲 Advanced RBAC & audit logs</li>
+                            <li>🔲 SSO integrations (Azure AD, Okta)</li>
+                            <li>🔲 Advanced connectors (20+)</li>
+                            <li>🔲 Custom connector SDK</li>
+                            <li>🔲 Advanced analytics dashboard</li>
+                            <li>🔲 White-label capabilities</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong style="color: #c084fc;">Phase 4: Scale</strong>
+                        <ul style="margin-top: 10px; opacity: 0.9; line-height: 1.8;">
+                            <li>🔲 Multi-region deployment</li>
+                            <li>🔲 Auto-scaling policies</li>
+                            <li>🔲 Advanced caching strategies</li>
+                            <li>🔲 ML model fine-tuning</li>
+                            <li>🔲 Edge computing support</li>
+                            <li>🔲 99.99% SLA</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding: 20px; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 8px;">
+                <h4 style="color: #1e40af; margin-bottom: 10px;">📌 Important Notes</h4>
+                <ul style="color: #475569; line-height: 1.8;">
+                    <li><strong>Current MVP Status:</strong> Single-tenant, development-focused deployment suitable for proof-of-concept and initial testing</li>
+                    <li><strong>Production Deployment:</strong> Requires implementation of security, multi-tenancy, and observability components outlined above</li>
+                    <li><strong>Scalability:</strong> Architecture designed for horizontal scaling from day one - can grow from 100 to 100,000+ users</li>
+                    <li><strong>Cost Optimization:</strong> Start with basic infrastructure and scale based on actual usage patterns</li>
+                    <li><strong>Compliance:</strong> Security and audit features support SOC 2, GDPR, HIPAA requirements when fully implemented</li>
+                    <li><strong>Customization:</strong> Modular architecture allows for organization-specific customization without core changes</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer style="background: #1e293b; color: white; padding: 30px; text-align: center;">
+            <h3 style="color: white; margin-bottom: 10px;">🤖 Self Agent</h3>
+            <p style="opacity: 0.8;">Enterprise-Grade AI-Powered Workflow Automation Platform</p>
+            <p style="opacity: 0.6; margin-top: 15px; font-size: 0.9rem;">
+                Version 1.0.0 | Architecture Documentation | Last Updated: 2025
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all sections
+            const sections = document.querySelectorAll('.diagram-section');
+            sections.forEach(section => section.classList.remove('active'));
+
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected section
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
