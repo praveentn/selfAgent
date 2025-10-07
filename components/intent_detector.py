@@ -1,6 +1,7 @@
 # components/intent_detector.py
 from components.vector_indexer import VectorIndexer
 from components.azure_client import AzureOpenAIClient
+from components.agent_awareness import AgentAwareness
 from database import IntentSample
 from sqlalchemy.orm import Session
 import logging
@@ -16,6 +17,7 @@ class IntentDetector:
         self.confidence_threshold = confidence_threshold
         self.vector_indexer = VectorIndexer(index_path='faiss_index/intents')
         self.azure_client = AzureOpenAIClient()
+        self.agent_awareness = AgentAwareness(db_session)
         
         # Initialize intent index
         self._initialize_intent_index()
@@ -26,7 +28,9 @@ class IntentDetector:
         
         if not intent_samples:
             logger.warning("No intent samples found in database")
-            return
+            # Add default samples for new intents
+            self._seed_new_intents()
+            intent_samples = self.db_session.query(IntentSample).all()
         
         # Clear and rebuild index
         self.vector_indexer.clear_index()
@@ -37,12 +41,33 @@ class IntentDetector:
         self.vector_indexer.add_texts(texts, ids)
         logger.info(f"Initialized intent index with {len(texts)} samples")
     
+    def _seed_new_intents(self):
+        """Seed new intent samples for file operations"""
+        new_samples = [
+            IntentSample(intent='read_file', sample_text='read file from local'),
+            IntentSample(intent='read_file', sample_text='show me contents of file'),
+            IntentSample(intent='read_file', sample_text='read file1.txt'),
+            IntentSample(intent='execute_code', sample_text='run python code'),
+            IntentSample(intent='execute_code', sample_text='execute script'),
+            IntentSample(intent='ask_capabilities', sample_text='what can you do'),
+            IntentSample(intent='ask_capabilities', sample_text='show capabilities'),
+        ]
+        
+        for sample in new_samples:
+            self.db_session.add(sample)
+        
+        self.db_session.commit()
+        logger.info("Seeded new intent samples")
+    
     def detect_intent(self, user_message: str, conversation_history: list = None) -> Tuple[str, float, Dict]:
         """
         Detect user intent using embedding-based search with LLM fallback
         
         Returns: (intent_name, confidence, parameters)
         """
+        # Get system context
+        system_context = self.agent_awareness.get_system_context()
+        
         # Step 1: Embedding-based matching
         search_results = self.vector_indexer.search(user_message, top_k=3)
         
@@ -63,7 +88,11 @@ class IntentDetector:
         
         # Step 2: LLM fallback for complex/ambiguous cases
         logger.info("Using LLM fallback for intent detection")
-        llm_result = self.azure_client.parse_intent(user_message, conversation_history)
+        llm_result = self.azure_client.parse_intent(
+            user_message, 
+            conversation_history,
+            system_context
+        )
         
         intent = llm_result.get('intent', 'unknown')
         confidence = llm_result.get('confidence', 0.5)

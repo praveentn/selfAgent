@@ -17,9 +17,13 @@ class FlowManager:
         self.db_session = db_session
         self.flows_dir = Path(flows_dir)
         self.flows_dir.mkdir(exist_ok=True)
-    
+
     def create_flow(self, name: str, description: str, steps: List[Dict], author: str = 'system') -> Flow:
         """Create new flow with initial version"""
+        
+        # Normalize steps before creating flow
+        normalized_steps = self.normalize_flow_steps(steps)
+        
         # Create flow record
         flow = Flow(
             name=name,
@@ -40,7 +44,7 @@ class FlowManager:
             'name': name,
             'description': description,
             'version': 1,
-            'steps': steps
+            'steps': normalized_steps  # Use normalized steps
         }
         
         # Save flow file
@@ -62,7 +66,8 @@ class FlowManager:
         
         logger.info(f"Created flow: {name} (ID: {flow.id})")
         return flow
-    
+
+
     def get_flow(self, flow_id: int) -> Optional[Flow]:
         """Get flow by ID"""
         return self.db_session.query(Flow).filter(Flow.id == flow_id).first()
@@ -282,3 +287,42 @@ class FlowManager:
                 errors.append(f"Step {i} missing type")
         
         return len(errors) == 0, errors
+
+
+    def normalize_flow_steps(self, steps: List[Dict]) -> List[Dict]:
+        """Normalize and fix common step definition issues"""
+        normalized = []
+        
+        for step in steps:
+            normalized_step = step.copy()
+            
+            connector = step.get('connector', '').lower()
+            action = step.get('action', '').lower()
+            
+            # Fix local_file connector actions
+            if connector == 'local_file':
+                action_map = {
+                    'read': 'read_file',
+                    'write': 'write_file',
+                    'list': 'list_files',
+                    'exists': 'file_exists',
+                    'delete': 'delete_file',
+                    'info': 'get_file_info'
+                }
+                normalized_step['action'] = action_map.get(action, action)
+                
+                # Fix params
+                params = normalized_step.get('params', {})
+                if 'filepath' in params and 'filename' not in params:
+                    filepath = params['filepath'].replace('data/', '').replace('data\\', '')
+                    params['filename'] = filepath
+                    del params['filepath']
+                
+                normalized_step['params'] = params
+            
+            # Fix other connectors similarly...
+            
+            normalized.append(normalized_step)
+        
+        return normalized
+

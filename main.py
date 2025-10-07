@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field  # ENSURE Field is imported
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from database import init_database, get_db_session
@@ -395,6 +395,111 @@ async def execute_sql(request: SQLExecute, db: Session = Depends(get_db)):
         db.rollback()
         logger.error(f"SQL execution error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class FlowDescriptionRequest(BaseModel):
+    description: str = Field(..., description="Natural language description of the flow")
+
+class ToolGenerateRequest(BaseModel):
+    tool_type: str = Field(default="file_reader", description="Type of tool to generate")
+    params: Dict = Field(default_factory=dict, description="Tool parameters")
+
+@app.post("/flows/create_from_description")
+async def create_flow_from_description(
+    request: FlowDescriptionRequest,
+    db: Session = Depends(get_db)
+):
+    """Create flow from natural language description"""
+    try:
+        from components.agent_awareness import AgentAwareness
+        
+        azure_client = AzureOpenAIClient()
+        agent_awareness = AgentAwareness(db)
+        
+        # Get system context
+        system_context = agent_awareness.get_system_context()
+        
+        # Generate flow definition
+        flow_def = azure_client.generate_flow_from_description(
+            request.description,
+            system_context
+        )
+        
+        if not flow_def or not flow_def.get('steps'):
+            raise HTTPException(status_code=500, detail="Failed to generate valid flow definition")
+        
+        # Create flow
+        flow_manager = FlowManager(db)
+        new_flow = flow_manager.create_flow(
+            name=flow_def.get('name', 'Generated Flow'),
+            description=flow_def.get('description', request.description),
+            steps=flow_def.get('steps', []),
+            author='agent'
+        )
+        
+        return {
+            "flow_id": new_flow.id,
+            "name": new_flow.name,
+            "version": new_flow.current_version,
+            "status": "created",
+            "definition": flow_def
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Flow creation from description error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/generate")
+async def generate_tool(request: ToolGenerateRequest, db: Session = Depends(get_db)):
+    """Generate Python tool code"""
+    try:
+        from components.code_generator import CodeGenerator
+        
+        code_gen = CodeGenerator()
+        
+        if request.tool_type == 'file_reader':
+            code = code_gen.generate_file_reader_tool(
+                filename=request.params.get('filename', 'file1.txt'),
+                file_path=request.params.get('file_path')
+            )
+        else:
+            code = code_gen.generate_custom_tool(
+                description=request.params.get('description', ''),
+                requirements=request.params
+            )
+        
+        return {
+            "status": "success",
+            "tool_type": request.tool_type,
+            "code": code
+        }
+    
+    except Exception as e:
+        logger.error(f"Tool generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/system/awareness")
+async def get_system_awareness(db: Session = Depends(get_db)):
+    """Get system awareness context"""
+    try:
+        from components.agent_awareness import AgentAwareness
+        
+        awareness = AgentAwareness(db)
+        
+        return {
+            "flows": awareness.get_available_flows(),
+            "connectors": awareness.get_available_connectors(),
+            "context": awareness.get_system_context()
+        }
+    
+    except Exception as e:
+        logger.error(f"System awareness error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

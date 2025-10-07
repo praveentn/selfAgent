@@ -29,7 +29,11 @@ class Config:
     AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
     AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1")
     AZURE_OPENAI_MODEL = os.getenv("AZURE_OPENAI_MODEL", "gpt-4.1")
-    
+
+    # Code Execution Configuration
+    CODE_DIR = os.getenv("CODE_DIR", "code")
+    VENV_PATH = os.getenv("VENV_PATH", "expts")
+    DATA_DIR = os.getenv("DATA_DIR", "data")
     
     @classmethod
     def validate_config(cls):

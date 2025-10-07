@@ -1,0 +1,16 @@
+Hello from Self-Agent!
+
+This is a test file located in the data directory.
+
+The Self-Agent system can now:
+- Read local files
+- Create workflows dynamically
+- Execute Python code
+- Understand system capabilities
+
+Test data:
+- Line 1: Invoice #12345
+- Line 2: Amount $1,500.00
+- Line 3: Date: 2025-10-07
+
+End of file.

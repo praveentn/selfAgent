@@ -5,6 +5,10 @@ from typing import Dict, List, Optional
 import json
 import logging
 
+# Import new connectors
+from components.connectors.local_file_connector import LocalFileConnector
+from components.connectors.python_executor_connector import PythonExecutorConnector
+
 logger = logging.getLogger(__name__)
 
 class BaseConnector:
@@ -146,12 +150,14 @@ class ConnectorManager:
     def __init__(self, db_session: Session):
         self.db_session = db_session
         
-        # Register built-in connectors
+        # Register built-in connectors (including new ones)
         self.connectors = {
             'sql': SQLConnector(),
             'sharepoint': SharePointConnector(),
             'email': EmailConnector(),
-            'notification': NotificationConnector()
+            'notification': NotificationConnector(),
+            'local_file': LocalFileConnector(),
+            'python_executor': PythonExecutorConnector()
         }
         
         # Initialize database connectors
