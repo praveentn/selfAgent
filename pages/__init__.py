@@ -4,4 +4,4 @@ Self Agent Pages Package
 Contains Streamlit page modules
 """
 
-__all__ = ['chat', 'flows', 'connectors', 'runs', 'admin']
+__all__ = ['chat', 'flows', 'memory', 'connectors', 'runs', 'admin']

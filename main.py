@@ -1,7 +1,7 @@
 # main.py
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field  # ENSURE Field is imported
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from database import init_database, get_db_session
@@ -15,14 +15,11 @@ from config import Config
 import logging
 from sqlalchemy import text
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
 app = FastAPI(title="Self Agent API", version="1.0.0")
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,7 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database
 engine, SessionLocal = init_database()
 
 # Pydantic models
@@ -52,10 +48,15 @@ class FlowCreate(BaseModel):
     steps: List[Dict]
     author: Optional[str] = "system"
 
+class FlowUpdate(BaseModel):
+    description: Optional[str] = None
+    steps: List[Dict]
+    author: Optional[str] = "system"
+
 class FlowModify(BaseModel):
-    action: str  # insert_step, update_step, delete_step
+    action: str
     anchor_step_id: Optional[str] = None
-    position: Optional[str] = None  # before, after
+    position: Optional[str] = None
     new_step: Optional[Dict] = None
     step_id: Optional[str] = None
     author: Optional[str] = "system"
@@ -81,7 +82,21 @@ class SQLExecute(BaseModel):
     page: Optional[int] = 1
     page_size: Optional[int] = 50
 
-# Dependency to get DB session
+class FlowDescriptionRequest(BaseModel):
+    description: str = Field(..., description="Natural language description of the flow")
+
+class ToolGenerateRequest(BaseModel):
+    tool_type: str = Field(default="file_reader", description="Type of tool to generate")
+    params: Dict = Field(default_factory=dict, description="Tool parameters")
+
+class MemoryStoreRequest(BaseModel):
+    content: str
+    user_id: Optional[str] = "default_user"
+
+class RuleSetRequest(BaseModel):
+    rule: str
+    user_id: Optional[str] = "default_user"
+
 def get_db():
     db = SessionLocal()
     try:
@@ -91,7 +106,6 @@ def get_db():
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {
         "app": Config.APP_NAME,
         "version": Config.APP_VERSION,
@@ -100,33 +114,71 @@ async def root():
 
 @app.post("/intent", response_model=IntentResponse)
 async def detect_intent(request: IntentRequest, db: Session = Depends(get_db)):
-    """Detect user intent from natural language"""
+    """Detect user intent with parameter extraction"""
     try:
-        # Initialize components
         intent_detector = IntentDetector(db)
         conversation_manager = ConversationManager(db)
+        memory_manager = MemoryManager(db)
         azure_client = AzureOpenAIClient()
         
         # Get conversation history
-        history = conversation_manager.get_recent_context(request.user_id, n=5)
+        history = conversation_manager.get_recent_context(
+            request.user_id, 
+            n=5, 
+            session_id=request.session_id
+        )
         
-        # Detect intent
+        # Detect intent with parameters
         intent, confidence, parameters = intent_detector.detect_intent(
             request.text,
             conversation_history=history
         )
         
+        # Check if this is a memory storage request
+        if any(keyword in request.text.lower() for keyword in ['remember', 'save this', 'store this', 'always', 'never']):
+            memory_type = memory_manager.classify_memory_type(request.text)
+            
+            if memory_type == 'RULE':
+                intent = 'set_rule'
+                parameters['rule'] = request.text
+            elif memory_type == 'LONG_TERM':
+                intent = 'store_memory'
+                parameters['content'] = request.text
+                parameters['memory_type'] = 'LONG_TERM'
+        
+        # Get user context from long-term memory and rules
+        user_context = memory_manager.get_context_for_user(request.user_id)
+        
+        # Get system prompt with rules
+        base_prompt = f"Detected intent: {intent} (confidence: {confidence:.2f})"
+        if user_context:
+            base_prompt += f"\nUser context: {user_context}"
+        
+        system_prompt = memory_manager.get_system_prompt_with_rules(
+            base_prompt,
+            request.user_id
+        )
+        
         # Generate response
-        context = f"Detected intent: {intent} (confidence: {confidence:.2f})"
         response_text = azure_client.generate_response(
             request.text,
-            context=context,
+            context=system_prompt,
             conversation_history=history
         )
         
         # Store conversation
-        conversation_manager.add_message(request.text, 'user', request.user_id)
-        conversation_manager.add_message(response_text, 'assistant', request.user_id)
+        conversation_manager.add_message(
+            request.text, 
+            'user', 
+            request.user_id,
+            session_id=request.session_id
+        )
+        conversation_manager.add_message(
+            response_text, 
+            'assistant', 
+            request.user_id,
+            session_id=request.session_id
+        )
         
         return IntentResponse(
             intent=intent,
@@ -231,6 +283,42 @@ async def execute_flow(flow_id: int, db: Session = Depends(get_db)):
         logger.error(f"Flow execution error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/flows/{flow_id}/update")
+async def update_flow(flow_id: int, update: FlowUpdate, db: Session = Depends(get_db)):
+    """Update flow with new version"""
+    try:
+        flow_manager = FlowManager(db)
+        
+        new_version = flow_manager.update_flow(
+            flow_id=flow_id,
+            steps=update.steps,
+            description=update.description,
+            author=update.author
+        )
+        
+        return {
+            "flow_id": flow_id,
+            "version_no": new_version.version_no,
+            "status": "updated"
+        }
+    
+    except Exception as e:
+        logger.error(f"Flow update error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/flows/{flow_id}")
+async def delete_flow(flow_id: int, db: Session = Depends(get_db)):
+    """Delete flow"""
+    try:
+        flow_manager = FlowManager(db)
+        flow_manager.delete_flow(flow_id)
+        
+        return {"status": "deleted", "flow_id": flow_id}
+    
+    except Exception as e:
+        logger.error(f"Flow deletion error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/runs/{run_id}")
 async def get_run(run_id: int, db: Session = Depends(get_db)):
     """Get run status"""
@@ -275,18 +363,20 @@ async def modify_flow(flow_id: int, modification: FlowModify, db: Session = Depe
         logger.error(f"Flow modification error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/conversations/{session_id}")
+@app.get("/conversations/{user_id}")
 async def get_conversations(
-    session_id: str,
+    user_id: str,
     limit: int = 50,
+    session_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Get conversation history"""
     try:
         conversation_manager = ConversationManager(db)
         conversations = conversation_manager.get_conversation_history(
-            user_id=session_id,
-            limit=limit
+            user_id=user_id,
+            limit=limit,
+            session_id=session_id
         )
         
         return [
@@ -302,6 +392,105 @@ async def get_conversations(
     
     except Exception as e:
         logger.error(f"Get conversations error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/conversations/sessions/{user_id}")
+async def get_sessions(user_id: str, db: Session = Depends(get_db)):
+    """Get all conversation sessions"""
+    try:
+        conversation_manager = ConversationManager(db)
+        sessions = conversation_manager.get_all_sessions(user_id)
+        
+        return sessions
+    
+    except Exception as e:
+        logger.error(f"Get sessions error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/conversations/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    user_id: str = "default_user",
+    db: Session = Depends(get_db)
+):
+    """Delete a conversation session"""
+    try:
+        conversation_manager = ConversationManager(db)
+        conversation_manager.clear_session(session_id, user_id)
+        
+        return {"status": "deleted", "session_id": session_id}
+    
+    except Exception as e:
+        logger.error(f"Delete session error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/store")
+async def store_memory(request: MemoryStoreRequest, db: Session = Depends(get_db)):
+    """Store memory with automatic classification"""
+    try:
+        memory_manager = MemoryManager(db)
+        
+        # Classify memory type
+        memory_type = memory_manager.classify_memory_type(request.content)
+        
+        # Generate key from content
+        key = request.content[:50].replace(' ', '_').lower()
+        
+        # Store memory
+        memory_manager.store_memory(
+            key=key,
+            value=request.content,
+            memory_type=memory_type,
+            user_id=request.user_id
+        )
+        
+        return {
+            "status": "stored",
+            "memory_type": memory_type,
+            "content": request.content
+        }
+    
+    except Exception as e:
+        logger.error(f"Store memory error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/memory/set_rule")
+async def set_rule(request: RuleSetRequest, db: Session = Depends(get_db)):
+    """Set behavior rule"""
+    try:
+        memory_manager = MemoryManager(db)
+        
+        # Generate key from rule
+        key = request.rule[:50].replace(' ', '_').lower()
+        
+        # Store as rule
+        memory_manager.store_memory(
+            key=key,
+            value=request.rule,
+            memory_type='RULE',
+            user_id=request.user_id
+        )
+        
+        return {
+            "status": "rule_set",
+            "rule": request.rule
+        }
+    
+    except Exception as e:
+        logger.error(f"Set rule error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/memory/rules/{user_id}")
+async def get_rules(user_id: str, db: Session = Depends(get_db)):
+    """Get all rules for user"""
+    try:
+        memory_manager = MemoryManager(db)
+        rules = memory_manager.get_all_rules(user_id)
+        
+        return rules
+    
+    except Exception as e:
+        logger.error(f"Get rules error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/connectors/test")
@@ -360,15 +549,12 @@ async def semantic_query(request: SemanticQuery, db: Session = Depends(get_db)):
 async def execute_sql(request: SQLExecute, db: Session = Depends(get_db)):
     """Execute raw SQL query with pagination"""
     try:
-        # Execute query
         result = db.execute(text(request.query))
         
-        # Handle SELECT queries
         if request.query.strip().upper().startswith('SELECT'):
             rows = result.fetchall()
             columns = list(result.keys()) if rows else []
             
-            # Pagination
             total_rows = len(rows)
             start_idx = (request.page - 1) * request.page_size
             end_idx = start_idx + request.page_size
@@ -383,7 +569,6 @@ async def execute_sql(request: SQLExecute, db: Session = Depends(get_db)):
                 "total_pages": (total_rows + request.page_size - 1) // request.page_size
             }
         else:
-            # For INSERT, UPDATE, DELETE, etc.
             db.commit()
             return {
                 "status": "success",
@@ -395,14 +580,6 @@ async def execute_sql(request: SQLExecute, db: Session = Depends(get_db)):
         db.rollback()
         logger.error(f"SQL execution error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-class FlowDescriptionRequest(BaseModel):
-    description: str = Field(..., description="Natural language description of the flow")
-
-class ToolGenerateRequest(BaseModel):
-    tool_type: str = Field(default="file_reader", description="Type of tool to generate")
-    params: Dict = Field(default_factory=dict, description="Tool parameters")
 
 @app.post("/flows/create_from_description")
 async def create_flow_from_description(
@@ -416,10 +593,8 @@ async def create_flow_from_description(
         azure_client = AzureOpenAIClient()
         agent_awareness = AgentAwareness(db)
         
-        # Get system context
         system_context = agent_awareness.get_system_context()
         
-        # Generate flow definition
         flow_def = azure_client.generate_flow_from_description(
             request.description,
             system_context
@@ -428,7 +603,6 @@ async def create_flow_from_description(
         if not flow_def or not flow_def.get('steps'):
             raise HTTPException(status_code=500, detail="Failed to generate valid flow definition")
         
-        # Create flow
         flow_manager = FlowManager(db)
         new_flow = flow_manager.create_flow(
             name=flow_def.get('name', 'Generated Flow'),
@@ -450,7 +624,6 @@ async def create_flow_from_description(
     except Exception as e:
         logger.error(f"Flow creation from description error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/tools/generate")
 async def generate_tool(request: ToolGenerateRequest, db: Session = Depends(get_db)):
@@ -480,7 +653,6 @@ async def generate_tool(request: ToolGenerateRequest, db: Session = Depends(get_
     except Exception as e:
         logger.error(f"Tool generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/system/awareness")
 async def get_system_awareness(db: Session = Depends(get_db)):

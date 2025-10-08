@@ -6,23 +6,23 @@ import json
 from datetime import datetime
 
 def render():
-    st.title("🔄 Process Flows")
+    st.title("📄 Process Flows")
     st.markdown("Create, manage, and execute process workflows")
     
-    # Tabs
-    tab1, tab2, tab3 = st.tabs(["📋 All Flows", "➕ Create Flow", "📝 Flow Designer"])
+    tabs = st.tabs(["📋 All Flows", "➕ Create Flow", "🔧 Flow Designer"])
     
-    with tab1:
+    with tabs[0]:
         render_flows_list()
     
-    with tab2:
+    with tabs[1]:
         render_create_flow()
     
-    with tab3:
+    with tabs[2]:
         render_flow_designer()
 
+
 def render_flows_list():
-    """Display list of all flows"""
+    """Display list of all flows with modify/delete options"""
     st.subheader("All Flows")
     
     try:
@@ -38,7 +38,7 @@ def render_flows_list():
             # Display flows as cards
             for flow in flows:
                 with st.container():
-                    col1, col2, col3 = st.columns([3, 2, 1])
+                    col1, col2, col3 = st.columns([3, 2, 2])
                     
                     with col1:
                         st.markdown(f"### {flow['name']}")
@@ -49,18 +49,38 @@ def render_flows_list():
                         st.caption(f"Updated: {flow['updated_at'][:10]}")
                     
                     with col3:
-                        if st.button("▶️ Execute", key=f"exec_{flow['id']}"):
-                            execute_flow(flow['id'])
+                        action_col1, action_col2 = st.columns(2)
                         
-                        if st.button("👁️ View", key=f"view_{flow['id']}"):
-                            st.session_state.selected_flow_id = flow['id']
-                            st.rerun()
+                        with action_col1:
+                            if st.button("▶️ Execute", key=f"exec_{flow['id']}", use_container_width=True):
+                                execute_flow(flow['id'])
+                            
+                            if st.button("✏️ Modify", key=f"mod_{flow['id']}", use_container_width=True):
+                                st.session_state.modify_flow_id = flow['id']
+                                st.rerun()
+                        
+                        with action_col2:
+                            if st.button("👁️ View", key=f"view_{flow['id']}", use_container_width=True):
+                                st.session_state.selected_flow_id = flow['id']
+                                st.rerun()
+                            
+                            if st.button("🗑️ Delete", key=f"del_{flow['id']}", use_container_width=True, type="secondary"):
+                                st.session_state.delete_flow_id = flow['id']
+                                st.rerun()
                     
                     st.markdown("---")
             
             # Show flow details if selected
             if 'selected_flow_id' in st.session_state:
                 show_flow_details(st.session_state.selected_flow_id)
+            
+            # Show modify flow dialog
+            if 'modify_flow_id' in st.session_state:
+                show_modify_flow_dialog(st.session_state.modify_flow_id)
+            
+            # Show delete confirmation
+            if 'delete_flow_id' in st.session_state:
+                show_delete_confirmation(st.session_state.delete_flow_id)
         
         else:
             st.error("Failed to load flows")
@@ -68,13 +88,11 @@ def render_flows_list():
     except Exception as e:
         st.error(f"Error loading flows: {str(e)}")
 
+
 def show_flow_details(flow_id):
     """Show detailed flow information"""
     try:
-        response = httpx.get(
-            f"{st.session_state.api_url}/flows/{flow_id}",
-            timeout=5.0
-        )
+        response = httpx.get(f"{st.session_state.api_url}/flows/{flow_id}", timeout=5.0)
         
         if response.status_code == 200:
             flow = response.json()
@@ -111,6 +129,200 @@ def show_flow_details(flow_id):
     except Exception as e:
         st.error(f"Error loading flow details: {str(e)}")
 
+
+def show_modify_flow_dialog(flow_id):
+    """Show flow modification dialog"""
+    st.markdown("---")
+    st.subheader("✏️ Modify Flow")
+    
+    try:
+        response = httpx.get(f"{st.session_state.api_url}/flows/{flow_id}", timeout=5.0)
+        
+        if response.status_code == 200:
+            flow = response.json()
+            flow_content = flow.get('content', {})
+            
+            with st.form("modify_flow_form"):
+                st.markdown(f"**Modifying:** {flow['name']}")
+                
+                # Update description
+                new_description = st.text_area(
+                    "Description",
+                    value=flow['description'],
+                    height=100
+                )
+                
+                # Modify steps
+                st.markdown("### Steps")
+                
+                steps = flow_content.get('steps', [])
+                modified_steps = []
+                
+                for i, step in enumerate(steps):
+                    with st.expander(f"Step {i+1}: {step.get('name', 'Unnamed')}", expanded=True):
+                        col1, col2 = st.columns([3, 1])
+                        
+                        with col1:
+                            step_name = st.text_input(
+                                "Step Name",
+                                value=step.get('name', ''),
+                                key=f"mod_name_{i}"
+                            )
+                            
+                            step_connector = st.text_input(
+                                "Connector",
+                                value=step.get('connector', ''),
+                                key=f"mod_conn_{i}"
+                            )
+                            
+                            step_action = st.text_input(
+                                "Action",
+                                value=step.get('action', ''),
+                                key=f"mod_action_{i}"
+                            )
+                            
+                            step_params = st.text_area(
+                                "Parameters (JSON)",
+                                value=json.dumps(step.get('params', {}), indent=2),
+                                key=f"mod_params_{i}",
+                                height=100
+                            )
+                        
+                        with col2:
+                            remove_step = st.checkbox("Remove", key=f"mod_remove_{i}")
+                        
+                        if not remove_step:
+                            try:
+                                params = json.loads(step_params)
+                            except:
+                                params = {}
+                            
+                            modified_steps.append({
+                                "id": step.get('id', f"step_{i+1}"),
+                                "name": step_name,
+                                "type": step.get('type', step_connector),
+                                "connector": step_connector,
+                                "action": step_action,
+                                "params": params
+                            })
+                
+                # Add new step option
+                st.markdown("### Add New Step")
+                add_new = st.checkbox("Add new step")
+                
+                if add_new:
+                    new_step_name = st.text_input("New Step Name")
+                    new_step_connector = st.selectbox(
+                        "Connector",
+                        ["local_file", "sql", "sharepoint", "email", "notification", "python_executor"]
+                    )
+                    new_step_action = st.text_input("Action")
+                    new_step_params = st.text_area("Parameters (JSON)", value="{}")
+                    
+                    if new_step_name and new_step_action:
+                        try:
+                            params = json.loads(new_step_params)
+                        except:
+                            params = {}
+                        
+                        modified_steps.append({
+                            "id": f"step_{len(modified_steps) + 1}",
+                            "name": new_step_name,
+                            "type": new_step_connector,
+                            "connector": new_step_connector,
+                            "action": new_step_action,
+                            "params": params
+                        })
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    submitted = st.form_submit_button("💾 Save Changes", type="primary")
+                
+                with col2:
+                    cancel = st.form_submit_button("❌ Cancel")
+                
+                if cancel:
+                    del st.session_state.modify_flow_id
+                    st.rerun()
+                
+                if submitted:
+                    try:
+                        # Update flow
+                        update_response = httpx.post(
+                            f"{st.session_state.api_url}/flows/{flow_id}/update",
+                            json={
+                                "description": new_description,
+                                "steps": modified_steps
+                            },
+                            timeout=10.0
+                        )
+                        
+                        if update_response.status_code == 200:
+                            st.success("✅ Flow updated successfully!")
+                            del st.session_state.modify_flow_id
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Failed to update flow")
+                    
+                    except Exception as e:
+                        st.error(f"Error updating flow: {str(e)}")
+    
+    except Exception as e:
+        st.error(f"Error loading flow: {str(e)}")
+
+
+def show_delete_confirmation(flow_id):
+    """Show delete confirmation dialog"""
+    st.markdown("---")
+    st.warning("⚠️ **Delete Flow Confirmation**")
+    
+    try:
+        response = httpx.get(f"{st.session_state.api_url}/flows/{flow_id}", timeout=5.0)
+        
+        if response.status_code == 200:
+            flow = response.json()
+            
+            st.markdown(f"Are you sure you want to delete **{flow['name']}**?")
+            st.caption("This action cannot be undone.")
+            
+            col1, col2, col3 = st.columns([1, 1, 2])
+            
+            with col1:
+                if st.button("🗑️ Yes, Delete", type="primary"):
+                    delete_flow(flow_id)
+            
+            with col2:
+                if st.button("❌ Cancel"):
+                    del st.session_state.delete_flow_id
+                    st.rerun()
+    
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+
+
+def delete_flow(flow_id):
+    """Delete a flow"""
+    try:
+        response = httpx.delete(
+            f"{st.session_state.api_url}/flows/{flow_id}",
+            timeout=5.0
+        )
+        
+        if response.status_code == 200:
+            st.success("✅ Flow deleted successfully!")
+            if 'delete_flow_id' in st.session_state:
+                del st.session_state.delete_flow_id
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error("Failed to delete flow")
+    
+    except Exception as e:
+        st.error(f"Error deleting flow: {str(e)}")
+
+
 def execute_flow(flow_id):
     """Execute a flow"""
     try:
@@ -124,50 +336,12 @@ def execute_flow(flow_id):
                 result = response.json()
                 st.success(f"✅ Flow executed! Run ID: {result['run_id']}")
                 st.session_state.last_run_id = result['run_id']
-                
-                # Show run status
-                with st.expander("📊 View Run Status"):
-                    show_run_status(result['run_id'])
             else:
                 st.error("Failed to execute flow")
     
     except Exception as e:
         st.error(f"Error executing flow: {str(e)}")
 
-def show_run_status(run_id):
-    """Show run status"""
-    try:
-        response = httpx.get(
-            f"{st.session_state.api_url}/runs/{run_id}",
-            timeout=5.0
-        )
-        
-        if response.status_code == 200:
-            run = response.json()
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Status", run['status'].upper())
-            with col2:
-                st.metric("Flow ID", run['flow_id'])
-            with col3:
-                st.metric("Version", f"v{run['version_no']}")
-            
-            # Display steps
-            if run.get('steps'):
-                st.markdown("### Steps")
-                for step in run['steps']:
-                    status_color = {
-                        'completed': '🟢',
-                        'running': '🟡',
-                        'failed': '🔴',
-                        'pending': '⚪'
-                    }.get(step['status'], '⚪')
-                    
-                    st.markdown(f"{status_color} **{step['name']}** - {step['status']}")
-    
-    except Exception as e:
-        st.error(f"Error loading run status: {str(e)}")
 
 def render_create_flow():
     """Form to create new flow"""
@@ -182,15 +356,15 @@ def render_create_flow():
         
         steps = []
         for i in range(num_steps):
-            with st.expander(f"Step {i+1}"):
+            with st.expander(f"Step {i+1}", expanded=True):
                 step_id = st.text_input(f"Step ID", value=f"step_{i+1}", key=f"sid_{i}")
                 step_name = st.text_input(f"Step Name", placeholder="e.g., Read Invoice", key=f"sname_{i}")
                 step_type = st.selectbox(
-                    f"Type",
-                    ["sql", "sharepoint", "email", "notification"],
+                    f"Connector",
+                    ["local_file", "sql", "sharepoint", "email", "notification", "python_executor"],
                     key=f"stype_{i}"
                 )
-                step_action = st.text_input(f"Action", placeholder="e.g., query", key=f"saction_{i}")
+                step_action = st.text_input(f"Action", placeholder="e.g., read_file", key=f"saction_{i}")
                 
                 steps.append({
                     "id": step_id,
@@ -201,7 +375,7 @@ def render_create_flow():
                     "params": {}
                 })
         
-        submitted = st.form_submit_button("Create Flow")
+        submitted = st.form_submit_button("Create Flow", type="primary")
         
         if submitted:
             if not name:
@@ -228,6 +402,7 @@ def render_create_flow():
             except Exception as e:
                 st.error(f"Error creating flow: {str(e)}")
 
+
 def render_flow_designer():
     """YAML/JSON flow designer"""
     st.subheader("Flow Designer")
@@ -235,7 +410,6 @@ def render_flow_designer():
     
     format_choice = st.radio("Format", ["YAML", "JSON"], horizontal=True)
     
-    # Template
     template = {
         "name": "Sample Flow",
         "description": "A sample workflow",
@@ -243,10 +417,10 @@ def render_flow_designer():
             {
                 "id": "step_1",
                 "name": "Read Data",
-                "type": "sharepoint",
-                "connector": "sharepoint",
+                "type": "local_file",
+                "connector": "local_file",
                 "action": "read_file",
-                "params": {"filename": "data.xlsx"}
+                "params": {"filename": "data.txt"}
             },
             {
                 "id": "step_2",
@@ -255,14 +429,6 @@ def render_flow_designer():
                 "connector": "sql",
                 "action": "insert",
                 "params": {"table": "invoices"}
-            },
-            {
-                "id": "step_3",
-                "name": "Send Notification",
-                "type": "email",
-                "connector": "email",
-                "action": "send",
-                "params": {"to": "finance@company.com"}
             }
         ]
     }

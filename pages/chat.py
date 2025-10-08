@@ -4,49 +4,43 @@ import httpx
 from datetime import datetime
 import json
 import time
+import uuid
 
 def render():
     st.title("💬 Chat Console")
     st.markdown("Interact with Self Agent using natural language")
     
+    # Initialize session management
+    if 'current_session_id' not in st.session_state:
+        st.session_state.current_session_id = str(uuid.uuid4())
+    
+    # Sidebar: Conversation history and sessions
+    with st.sidebar:
+        render_session_manager()
+    
     # Initialize chat history
     if 'chat_messages' not in st.session_state:
         st.session_state.chat_messages = []
-        # Load conversation history from API
-        try:
-            response = httpx.get(
-                f"{st.session_state.api_url}/conversations/{st.session_state.user_id}",
-                timeout=5.0
-            )
-            if response.status_code == 200:
-                conversations = response.json()
-                st.session_state.chat_messages = [
-                    {"role": conv["role"], "content": conv["message"]}
-                    for conv in conversations
-                ]
-        except Exception as e:
-            st.info("Starting new conversation")
+        load_session_history()
     
     # Display chat messages
     for message in st.session_state.chat_messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             
-            # Display structured data if present
             if message.get("data"):
                 with st.expander("📊 View Data"):
                     st.json(message["data"])
     
     # Chat input
     if prompt := st.chat_input("Type your message here..."):
-        # Add user message to chat
+        # Add user message
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
         
-        # Display user message
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        # Get response from API
+        # Get response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
@@ -54,7 +48,7 @@ def render():
                         f"{st.session_state.api_url}/intent",
                         json={
                             "text": prompt,
-                            "session_id": st.session_state.user_id,
+                            "session_id": st.session_state.current_session_id,
                             "user_id": st.session_state.user_id
                         },
                         timeout=30.0
@@ -62,33 +56,36 @@ def render():
                     
                     if response.status_code == 200:
                         data = response.json()
-                        assistant_response = data.get("response", "I'm not sure how to respond to that.")
+                        assistant_response = data.get("response", "I'm not sure how to respond.")
                         intent = data.get("intent", "unknown")
                         confidence = data.get("confidence", 0.0)
                         parameters = data.get("parameters", {})
                         
-                        # Handle specific intents with actual execution
+                        # Handle specific intents with better messaging
                         execution_result = None
                         
-                        if intent == "create_flow" and confidence > 0.7:
+                        if intent == "set_rule" and confidence > 0.7:
+                            execution_result = handle_set_rule(parameters)
+                        
+                        elif intent == "create_flow" and confidence > 0.7:
                             execution_result = handle_create_flow(prompt, parameters)
-                            if execution_result:
-                                assistant_response = execution_result
                         
                         elif intent == "read_file" and confidence > 0.7:
                             execution_result = handle_read_file(parameters)
-                            if execution_result:
-                                assistant_response = execution_result
                         
                         elif intent == "run_flow" and confidence > 0.7:
                             execution_result = handle_run_flow(parameters)
-                            if execution_result:
-                                assistant_response = execution_result
+                        
+                        elif intent == "store_memory" and confidence > 0.7:
+                            execution_result = handle_store_memory(parameters)
+                        
+                        if execution_result:
+                            assistant_response = execution_result
                         
                         # Display response
                         st.markdown(assistant_response)
                         
-                        # Show intent details in expander
+                        # Show intent details
                         with st.expander("🔍 Intent Details"):
                             col1, col2 = st.columns(2)
                             with col1:
@@ -99,7 +96,7 @@ def render():
                             if parameters:
                                 st.json(parameters)
                         
-                        # Add to chat history
+                        # Add to history
                         st.session_state.chat_messages.append({
                             "role": "assistant",
                             "content": assistant_response
@@ -128,45 +125,135 @@ def render():
                         "role": "assistant",
                         "content": error_msg
                     })
+
+
+def render_session_manager():
+    """Render session management sidebar"""
+    st.markdown("### 💬 Chat Sessions")
     
-    # Sidebar with chat options
-    with st.sidebar:
-        st.markdown("### Chat Options")
+    if st.button("➕ New Chat", use_container_width=True):
+        st.session_state.current_session_id = str(uuid.uuid4())
+        st.session_state.chat_messages = []
+        st.rerun()
+    
+    st.markdown("---")
+    
+    try:
+        response = httpx.get(
+            f"{st.session_state.api_url}/conversations/sessions/{st.session_state.user_id}",
+            timeout=5.0
+        )
         
-        if st.button("🗑️ Clear Chat"):
-            st.session_state.chat_messages = []
-            st.rerun()
+        if response.status_code == 200:
+            sessions = response.json()
+            
+            if sessions:
+                st.markdown("**Recent Sessions:**")
+                
+                for session in sessions[:10]:
+                    session_id = session['session_id']
+                    message_count = session['message_count']
+                    last_updated = session['last_updated'][:16] if session['last_updated'] else 'N/A'
+                    
+                    is_current = (session_id == st.session_state.current_session_id)
+                    
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        if st.button(
+                            f"{'🟢' if is_current else '⚪'} Session ({message_count} msgs)",
+                            key=f"session_{session_id}",
+                            use_container_width=True,
+                            disabled=is_current
+                        ):
+                            st.session_state.current_session_id = session_id
+                            st.session_state.chat_messages = []
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("🗑️", key=f"del_{session_id}"):
+                            delete_session(session_id)
+                            st.rerun()
+                    
+                    st.caption(f"Updated: {last_updated}")
+            else:
+                st.info("No previous sessions")
+    
+    except Exception as e:
+        st.caption(f"Error loading sessions")
+    
+    st.markdown("---")
+    st.markdown("### ⚡ Quick Actions")
+    
+    if st.button("📋 List Flows"):
+        st.session_state.chat_messages.append({
+            "role": "user",
+            "content": "List all available flows"
+        })
+        st.rerun()
+    
+    if st.button("🧠 View Memory"):
+        st.switch_page("pages/memory.py")
+
+
+def load_session_history():
+    """Load conversation history for current session"""
+    try:
+        response = httpx.get(
+            f"{st.session_state.api_url}/conversations/{st.session_state.user_id}",
+            params={"session_id": st.session_state.current_session_id},
+            timeout=5.0
+        )
         
-        st.markdown("---")
-        st.markdown("### Quick Actions")
+        if response.status_code == 200:
+            conversations = response.json()
+            st.session_state.chat_messages = [
+                {"role": conv["role"], "content": conv["message"]}
+                for conv in conversations
+            ]
+    except:
+        pass
+
+
+def delete_session(session_id: str):
+    """Delete a conversation session"""
+    try:
+        httpx.delete(
+            f"{st.session_state.api_url}/conversations/sessions/{session_id}",
+            params={"user_id": st.session_state.user_id},
+            timeout=5.0
+        )
+    except:
+        pass
+
+
+def handle_set_rule(parameters: dict) -> str:
+    """Handle behavior rule setting with proper messaging"""
+    rule = parameters.get('rule', '')
+    
+    try:
+        response = httpx.post(
+            f"{st.session_state.api_url}/memory/set_rule",
+            json={
+                "rule": rule,
+                "user_id": st.session_state.user_id
+            },
+            timeout=5.0
+        )
         
-        if st.button("📋 List Flows"):
-            st.session_state.chat_messages.append({
-                "role": "user",
-                "content": "List all available flows"
-            })
-            st.rerun()
-        
-        if st.button("🔌 Show Connectors"):
-            st.session_state.chat_messages.append({
-                "role": "user",
-                "content": "What connectors are available?"
-            })
-            st.rerun()
-        
-        if st.button("📊 Recent Runs"):
-            st.session_state.chat_messages.append({
-                "role": "user",
-                "content": "Show me recent execution history"
-            })
-            st.rerun()
-        
-        if st.button("📁 Read File"):
-            st.session_state.chat_messages.append({
-                "role": "user",
-                "content": "Read file1.txt from data folder"
-            })
-            st.rerun()
+        if response.status_code == 200:
+            return f"""✅ **Behavior Rule Set**
+
+**Rule:** {rule}
+
+This rule will now affect how I respond in all our conversations. I'll apply this guideline from now on.
+
+You can view all active rules in the **🧠 Memory** tab, where you can also see how they modify my system prompt."""
+        else:
+            return "❌ Failed to set rule"
+    
+    except Exception as e:
+        return f"❌ Error setting rule: {str(e)}"
 
 
 def handle_create_flow(description: str, parameters: dict) -> str:
@@ -188,26 +275,25 @@ def handle_create_flow(description: str, parameters: dict) -> str:
 **Flow ID:** {result['flow_id']}
 **Version:** v{result['version']}
 
-The flow has been created and is ready to execute. You can run it by saying "execute {result['name']}" or "run flow {result['flow_id']}"."""
+The workflow has been created and is ready to execute."""
                 
                 with st.expander("📄 View Flow Definition"):
                     st.json(result.get('definition', {}))
                 
                 return flow_info
             else:
-                return "❌ Failed to create flow. Please try again with more details."
+                return "❌ Failed to create flow. Please try again."
     
     except Exception as e:
         return f"❌ Error creating flow: {str(e)}"
 
 
 def handle_read_file(parameters: dict) -> str:
-    """Handle file reading by creating and executing a flow"""
+    """Handle file reading with dynamic parameters"""
     filename = parameters.get('filename', 'file1.txt')
     
     try:
         with st.spinner(f"Reading {filename}..."):
-            # Create a flow to read the file
             flow_def = {
                 "name": f"Read {filename}",
                 "description": f"Read contents of {filename}",
@@ -223,7 +309,6 @@ def handle_read_file(parameters: dict) -> str:
                 ]
             }
             
-            # Create flow
             create_response = httpx.post(
                 f"{st.session_state.api_url}/flows",
                 json=flow_def,
@@ -233,7 +318,6 @@ def handle_read_file(parameters: dict) -> str:
             if create_response.status_code == 200:
                 flow_id = create_response.json()['flow_id']
                 
-                # Execute flow
                 exec_response = httpx.post(
                     f"{st.session_state.api_url}/flows/{flow_id}/execute",
                     timeout=30.0
@@ -241,28 +325,23 @@ def handle_read_file(parameters: dict) -> str:
                 
                 if exec_response.status_code == 200:
                     run_id = exec_response.json()['run_id']
-                    
-                    # Wait for execution and get result
                     result = wait_for_run_completion(run_id, max_wait=10)
                     
                     if result:
                         return result
-                    else:
-                        return f"❌ Could not retrieve execution results for run {run_id}"
             
-            return "❌ Failed to execute file reading operation"
+            return f"❌ Failed to read {filename}"
     
     except Exception as e:
         return f"❌ Error reading file: {str(e)}"
 
 
 def handle_run_flow(parameters: dict) -> str:
-    """Handle flow execution and display results"""
+    """Handle flow execution with parameters"""
     flow_name = parameters.get('flow_name')
     flow_id = parameters.get('flow_id')
     
     try:
-        # Find flow by name if only name provided
         if not flow_id and flow_name:
             flows_response = httpx.get(
                 f"{st.session_state.api_url}/flows",
@@ -279,7 +358,6 @@ def handle_run_flow(parameters: dict) -> str:
         
         if flow_id:
             with st.spinner(f"Executing flow..."):
-                # Execute flow
                 exec_response = httpx.post(
                     f"{st.session_state.api_url}/flows/{flow_id}/execute",
                     timeout=30.0
@@ -287,16 +365,12 @@ def handle_run_flow(parameters: dict) -> str:
                 
                 if exec_response.status_code == 200:
                     run_id = exec_response.json()['run_id']
-                    
-                    # Wait for execution and get result
                     result = wait_for_run_completion(run_id, max_wait=10)
                     
                     if result:
                         return result
                     else:
-                        return f"✅ Flow execution started (Run ID: {run_id}). Check the Runs tab for details."
-                else:
-                    return "❌ Failed to execute flow"
+                        return f"✅ Flow execution started (Run ID: {run_id})"
         else:
             return f"❌ Could not find flow: {flow_name}"
     
@@ -304,11 +378,36 @@ def handle_run_flow(parameters: dict) -> str:
         return f"❌ Error executing flow: {str(e)}"
 
 
+def handle_store_memory(parameters: dict) -> str:
+    """Handle memory storage"""
+    content = parameters.get('content', '')
+    
+    try:
+        response = httpx.post(
+            f"{st.session_state.api_url}/memory/store",
+            json={
+                "content": content,
+                "user_id": st.session_state.user_id
+            },
+            timeout=5.0
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            memory_type = result.get('memory_type', 'short-term')
+            return f"✅ Stored as {memory_type} memory: {content}"
+        else:
+            return "❌ Failed to store memory"
+    
+    except Exception as e:
+        return f"❌ Error storing memory: {str(e)}"
+
+
 def wait_for_run_completion(run_id: int, max_wait: int = 10) -> str:
     """Wait for run to complete and format results"""
     for i in range(max_wait):
         try:
-            time.sleep(1)  # Wait 1 second between checks
+            time.sleep(1)
             
             run_response = httpx.get(
                 f"{st.session_state.api_url}/runs/{run_id}",
@@ -320,8 +419,7 @@ def wait_for_run_completion(run_id: int, max_wait: int = 10) -> str:
                 
                 if run_data['status'] in ['completed', 'failed']:
                     return format_run_results(run_data)
-                
-        except Exception as e:
+        except:
             continue
     
     return None
@@ -332,42 +430,31 @@ def format_run_results(run_data: dict) -> str:
     status = run_data['status']
     
     if status == 'failed':
-        return f"❌ **Execution Failed**\n\nRun ID: {run_data['run_id']}\nStatus: {status}"
+        return f"❌ **Execution Failed**\n\nRun ID: {run_data['run_id']}"
     
-    # Build result message
-    result_parts = [f"✅ **Execution Completed Successfully!**\n"]
-    result_parts.append(f"**Run ID:** {run_data['run_id']}")
-    result_parts.append(f"**Flow ID:** {run_data['flow_id']}\n")
+    result_parts = [f"✅ **Execution Completed!**\n"]
+    result_parts.append(f"**Run ID:** {run_data['run_id']}\n")
     
-    # Process steps and extract meaningful results
     steps = run_data.get('steps', [])
     
     for step in steps:
         if step['status'] == 'completed' and step.get('result'):
             result = step['result']
             
-            # Handle file read results
             if result.get('action') == 'read_file' and result.get('content'):
                 content = result['content']
                 filename = result.get('filename', 'file')
                 
-                result_parts.append(f"### 📄 File Content: `{filename}`\n")
+                result_parts.append(f"### 📄 File: `{filename}`\n")
                 result_parts.append(f"**Size:** {result.get('size_bytes', 0)} bytes")
                 result_parts.append(f"**Lines:** {result.get('lines', 0)}\n")
                 result_parts.append("**Content:**")
                 result_parts.append(f"```\n{content}\n```")
                 
-                # Display in expander if content is long
                 if len(content) > 500:
                     with st.expander("📄 View Full Content"):
-                        st.text_area(
-                            "File Content",
-                            value=content,
-                            height=300,
-                            disabled=True
-                        )
+                        st.text_area("File Content", value=content, height=300, disabled=True)
             
-            # Handle other result types
             elif result.get('status') == 'success':
                 result_parts.append(f"\n**Step:** {step['name']}")
                 result_parts.append(f"**Result:** {result.get('result', 'Success')}")

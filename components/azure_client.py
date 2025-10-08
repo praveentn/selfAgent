@@ -43,62 +43,87 @@ class AzureOpenAIClient:
             logger.error(f"Azure OpenAI error: {e}")
             raise
     
-    def parse_intent(self, user_message: str, conversation_history: list = None, system_context: str = None) -> dict:
-        """Parse user intent using LLM with system awareness"""
-        system_prompt = """You are an intent parser for a workflow automation system.
-Analyze the user's message and extract:
-1. intent: The primary action (run_flow, modify_flow, create_flow, list_flows, ask_history, store_memory, recall_memory, ask_capabilities, read_file, execute_code)
-2. confidence: Your confidence level (0.0 to 1.0)
-3. parameters: Relevant parameters extracted from the message
+    def parse_intent_enhanced(self, user_message: str, conversation_history: list = None, system_context: str = None) -> dict:
+        """Enhanced intent parsing with clear distinction between flow operations and conversation rules"""
+        
+        system_prompt = """You are an intent classifier for a workflow automation system with conversational AI capabilities.
+
+CRITICAL DISTINCTIONS:
+
+1. **SET_RULE Intent** (Conversation Behavior):
+   - User wants to CHANGE HOW THE AI RESPONDS in conversations
+   - Examples: "always ask a follow up question", "be more formal", "respond in bullet points"
+   - Keywords: "always", "never", "respond", "be", "act as", "sound like", "tone"
+   - These affect the AI's conversation style, NOT workflow steps
+
+2. **MODIFY_FLOW Intent** (Workflow Changes):
+   - User wants to CHANGE AN EXISTING WORKFLOW/PROCESS
+   - Examples: "add a step to the invoice flow", "update step 2", "change the connector"
+   - Keywords: "flow", "workflow", "process", "step", "add step", "modify step"
+   - Must reference a specific workflow or process
+
+3. **CREATE_FLOW Intent** (New Workflow):
+   - User wants to CREATE A NEW WORKFLOW
+   - Examples: "create a flow to process invoices", "make a workflow for"
+   - Clear request to build something new
 
 Available intents:
+- set_rule: Change AI conversation behavior (HOW it responds)
+- store_memory: Store a fact to remember (WHAT to remember)
+- recall_memory: Retrieve stored information
 - create_flow: Create a new workflow
-- run_flow: Execute an existing flow
-- modify_flow: Modify an existing flow
-- list_flows: List available flows
-- read_file: Read a local file
+- run_flow: Execute an existing workflow
+- modify_flow: Modify an existing workflow structure
+- delete_flow: Delete a workflow
+- list_flows: List available workflows
+- read_file: Read a file
 - execute_code: Execute Python code
 - ask_capabilities: Ask about system capabilities
-- ask_history: Query execution history
+- general_query: General questions/conversation
 
-Respond ONLY with valid JSON in this format:
+Respond ONLY with valid JSON:
 {
     "intent": "intent_name",
     "confidence": 0.95,
     "parameters": {
-        "flow_name": "invoice_flow",
-        "action": "execute",
-        "filename": "file1.txt"
-    }
+        "rule": "the behavior rule",
+        "flow_name": "flow name if applicable"
+    },
+    "reasoning": "brief explanation of classification"
 }"""
         
-        # Add system context if provided
         if system_context:
             system_prompt += f"\n\nSYSTEM CONTEXT:\n{system_context}"
         
         messages = [{"role": "system", "content": system_prompt}]
         
         if conversation_history:
-            messages.extend(conversation_history[-5:])  # Last 5 messages for context
+            messages.extend(conversation_history[-3:])  # Last 3 messages for context
         
-        messages.append({"role": "user", "content": user_message})
+        messages.append({
+            "role": "user", 
+            "content": f"Classify this message:\n\n\"{user_message}\"\n\nRemember: If it's about HOW to respond (tone, style, format), it's SET_RULE. If it's about WHAT workflow to change, it's MODIFY_FLOW."
+        })
         
         try:
             response = self.chat_completion(
                 messages=messages,
-                temperature=0.3,
+                temperature=0.1,  # Low temperature for consistent classification
                 max_tokens=300,
                 response_format={"type": "json_object"}
             )
             
-            return json.loads(response)
+            result = json.loads(response)
+            logger.info(f"Intent classification: {result.get('intent')} - {result.get('reasoning', '')}")
+            return result
         
         except Exception as e:
             logger.error(f"Intent parsing error: {e}")
             return {
-                "intent": "unknown",
-                "confidence": 0.0,
-                "parameters": {}
+                "intent": "general_query",
+                "confidence": 0.3,
+                "parameters": {},
+                "reasoning": "Error in classification"
             }
     
     def generate_response(self, user_message: str, context: str = "", conversation_history: list = None, system_context: str = None) -> str:
@@ -169,7 +194,7 @@ CRITICAL: Use exact action names listed above. DO NOT invent new action names.""
         try:
             response = self.chat_completion(
                 messages=messages,
-                temperature=0.1,  # Lower temperature for more deterministic output
+                temperature=0.1,
                 max_tokens=800,
                 response_format={"type": "json_object"}
             )
@@ -179,19 +204,14 @@ CRITICAL: Use exact action names listed above. DO NOT invent new action names.""
             # Post-process to fix common mistakes
             if 'steps' in result:
                 for step in result['steps']:
-                    # Fix common action name mistakes
                     if step.get('connector') == 'local_file':
                         if step.get('action') in ['read', 'read_file']:
                             step['action'] = 'read_file'
-                            # Fix params
-                            if 'filepath' in step.get('params', {}):
+                            if 'params' in step and 'filepath' in step['params']:
                                 filepath = step['params']['filepath']
-                                # Remove data/ prefix if present
                                 step['params']['filename'] = filepath.replace('data/', '').replace('data\\', '')
                                 if 'filepath' in step['params']:
                                     del step['params']['filepath']
-                        elif step.get('action') in ['write', 'write_file']:
-                            step['action'] = 'write_file'
             
             return result
         except Exception as e:

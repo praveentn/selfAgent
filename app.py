@@ -3,11 +3,9 @@ import streamlit as st
 from config import Config
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Page configuration
 st.set_page_config(
     page_title=Config.APP_NAME,
     page_icon="🤖",
@@ -15,15 +13,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for enterprise look
+# Custom CSS
 st.markdown("""
 <style>
-    /* Main container */
     .main {
         background-color: #f8f9fa;
     }
     
-    /* Sidebar styling */
     [data-testid="stSidebar"] {
         background-color: #1e293b;
     }
@@ -32,7 +28,6 @@ st.markdown("""
         color: white;
     }
     
-    /* Headers */
     h1, h2, h3 {
         color: #1e293b;
         font-weight: 600;
@@ -60,7 +55,6 @@ st.markdown("""
         background-color: #2563eb;
     }
     
-    /* Status badges */
     .status-completed {
         background-color: #10b981;
         color: white;
@@ -132,7 +126,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar navigation
+# Sidebar
 st.sidebar.title(f"🤖 {Config.APP_NAME}")
 st.sidebar.markdown(f"**Version:** {Config.APP_VERSION}")
 st.sidebar.markdown("---")
@@ -140,7 +134,7 @@ st.sidebar.markdown("---")
 # Navigation
 page = st.sidebar.radio(
     "Navigation",
-    ["💬 Chat", "🔄 Flows", "🔌 Connectors", "📊 Runs", "⚙️ Admin"],
+    ["💬 Chat", "📄 Flows", "🧠 Memory", "🔌 Connectors", "📊 Runs", "⚙️ Admin"],
     label_visibility="collapsed"
 )
 
@@ -151,7 +145,7 @@ if 'api_url' not in st.session_state:
 if 'user_id' not in st.session_state:
     st.session_state.user_id = "default_user"
 
-# Display API status in sidebar
+# API status
 st.sidebar.markdown("---")
 st.sidebar.markdown("### System Status")
 
@@ -170,9 +164,12 @@ except Exception as e:
 if page == "💬 Chat":
     from pages import chat
     chat.render()
-elif page == "🔄 Flows":
+elif page == "📄 Flows":
     from pages import flows
     flows.render()
+elif page == "🧠 Memory":
+    from pages import memory
+    memory.render()
 elif page == "🔌 Connectors":
     from pages import connectors
     connectors.render()
